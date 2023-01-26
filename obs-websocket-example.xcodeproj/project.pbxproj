@@ -7,20 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		94890DA52981003D006EAB75 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 94890DA42981003D006EAB75 /* AppDelegate.m */; };
+		94890DA52981003D006EAB75 /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 94890DA42981003D006EAB75 /* AppDelegate.mm */; };
 		94890DA72981003E006EAB75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 94890DA62981003E006EAB75 /* Assets.xcassets */; };
 		94890DAA2981003E006EAB75 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 94890DA82981003E006EAB75 /* MainMenu.xib */; };
 		94890DAC2981003E006EAB75 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 94890DAB2981003E006EAB75 /* main.m */; };
+		94890DD5298111D1006EAB75 /* easywsclient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 94890DD3298111D1006EAB75 /* easywsclient.cpp */; };
+		94890E392981DB38006EAB75 /* yatest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 94890E372981DB38006EAB75 /* yatest.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		94890DA02981003D006EAB75 /* obs-websocket-example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "obs-websocket-example.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		94890DA32981003D006EAB75 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
-		94890DA42981003D006EAB75 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
+		94890DA42981003D006EAB75 /* AppDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AppDelegate.mm; sourceTree = "<group>"; };
 		94890DA62981003E006EAB75 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		94890DA92981003E006EAB75 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		94890DAB2981003E006EAB75 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		94890DAD2981003E006EAB75 /* obs_websocket_example.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = obs_websocket_example.entitlements; sourceTree = "<group>"; };
+		94890DD3298111D1006EAB75 /* easywsclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = easywsclient.cpp; sourceTree = "<group>"; };
+		94890DD4298111D1006EAB75 /* easywsclient.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = easywsclient.hpp; sourceTree = "<group>"; };
+		94890E372981DB38006EAB75 /* yatest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = yatest.cpp; sourceTree = "<group>"; };
+		94890E382981DB38006EAB75 /* yatest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = yatest.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,11 +60,15 @@
 			isa = PBXGroup;
 			children = (
 				94890DA32981003D006EAB75 /* AppDelegate.h */,
-				94890DA42981003D006EAB75 /* AppDelegate.m */,
+				94890DA42981003D006EAB75 /* AppDelegate.mm */,
 				94890DA62981003E006EAB75 /* Assets.xcassets */,
 				94890DA82981003E006EAB75 /* MainMenu.xib */,
 				94890DAB2981003E006EAB75 /* main.m */,
 				94890DAD2981003E006EAB75 /* obs_websocket_example.entitlements */,
+				94890DD3298111D1006EAB75 /* easywsclient.cpp */,
+				94890DD4298111D1006EAB75 /* easywsclient.hpp */,
+				94890E372981DB38006EAB75 /* yatest.cpp */,
+				94890E382981DB38006EAB75 /* yatest.hpp */,
 			);
 			path = "obs-websocket-example";
 			sourceTree = "<group>";
@@ -132,8 +142,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94890DD5298111D1006EAB75 /* easywsclient.cpp in Sources */,
+				94890E392981DB38006EAB75 /* yatest.cpp in Sources */,
 				94890DAC2981003E006EAB75 /* main.m in Sources */,
-				94890DA52981003D006EAB75 /* AppDelegate.m in Sources */,
+				94890DA52981003D006EAB75 /* AppDelegate.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

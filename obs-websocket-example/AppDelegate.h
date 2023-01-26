@@ -7,7 +7,10 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSTableViewDataSource>
+{
+    dispatch_queue_t socketQueue;
+}
 
 
 @end
