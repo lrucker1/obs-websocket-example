@@ -5,6 +5,9 @@
 //  Created by Lee Ann Rucker on 1/24/23.
 //
 
+// Credit: https://github.com/dhbaird/easywsclient
+// Credit: https://stackoverflow.com/questions/69051106/c-or-c-websocket-client-working-example
+
 #import "AppDelegate.h"
 #include "easywsclient.hpp"
 #include <iostream>
@@ -17,6 +20,7 @@
 #include <atomic>
 
 // a simple, thread-safe queue with (mostly) non-blocking reads and writes
+// Yes, this could probably be replaced by dispatch_queue code.
 namespace non_blocking {
 template <class T>
 class Queue {
@@ -61,6 +65,41 @@ typedef enum  {
     Op_RequestBatchResponse = 9
 } OpCode;
 
+/*
+ 
+ EventSubscription::None
+ EventSubscription::General
+ EventSubscription::Config
+ EventSubscription::Scenes
+ EventSubscription::Inputs
+ EventSubscription::Transitions
+ EventSubscription::Filters
+ EventSubscription::Outputs
+ EventSubscription::SceneItems
+ EventSubscription::MediaInputs
+ EventSubscription::Vendors
+ EventSubscription::Ui
+ EventSubscription::All
+ EventSubscription::InputVolumeMeters
+ EventSubscription::InputActiveStateChanged
+ EventSubscription::InputShowStateChanged
+ EventSubscription::SceneItemTransformChanged
+ */
+typedef enum {
+    ES_None = 0,
+    ES_General = (1 << 0),
+    ES_Config = (1 << 1),
+    ES_Scenes = (1 << 2),
+    ES_Inputs = (1 << 3),
+    ES_Transition = (1 << 4),
+    ES_Filters = (1 << 5),
+    ES_Outputs = (1 << 6),
+    ES_SceneItems = (1 << 7),
+    ES_MediaInputs = (1 << 8),
+    ES_Vendors = (1 << 9),
+ // All non-high-volume events. (General | Config | Scenes | Inputs | Transitions | Filters | Outputs | SceneItems | MediaInputs | Vendors | Ui)
+    
+} EventSubscription;
 
 @interface AppDelegate () {
     non_blocking::Queue<std::string> outgoing;
@@ -74,6 +113,8 @@ typedef enum  {
 @property BOOL running;
 @property NSArray *obsInputs;
 @property IBOutlet NSTableView *tableView;
+@property NSString *requestId;
+@property NSString *obsURL;
 
 @end
 
@@ -82,11 +123,15 @@ typedef enum  {
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     // Insert code here to initialize your application
     socketQueue = dispatch_queue_create("socketQueue", NULL);
+    // A unique ID for requests when we don't care about matching request with reply.
+    self.requestId = [[NSUUID new] UUIDString];
+    self.obsURL = @"ws://localhost:4455";
 }
 
 
 - (void)applicationWillTerminate:(NSNotification *)aNotification {
     // Insert code here to tear down your application
+    self.running = NO;
 }
 
 
@@ -101,7 +146,7 @@ typedef enum  {
                                                          error:&error];
 
     if (! jsonData) {
-        NSLog(@"Got an error: %@", error);
+        [self writeToConsole:[NSString stringWithFormat:@"Error converting dictionary to JSON: %@", error] color:[NSColor redColor]];
         return nil;
     } else {
         return[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
@@ -109,15 +154,11 @@ typedef enum  {
 }
 
 - (NSString *)jsonHelloReply {
+    // This is a simple app; it only listens to scene changes.
     NSDictionary *dict = @{@"op":@(1),
                            @"d":@{@"rpcVersion":@(1),
-                                  @"eventSubscriptions":@(31)}};
+                                  @"eventSubscriptions":@(ES_General | ES_Scenes)}};
     return [self convertToJson:dict];
-}
-
-- (NSString *)requestID {
-    // TODO: Should be different so we can tell which response goes with which request.
-    return @"f819dcf0-89cc-11eb-8f0e-382c4ac93b9c";
 }
 
 - (NSString *)jsonGetSourceActive:(NSString *)sourceName {
@@ -133,7 +174,7 @@ typedef enum  {
    // {   "op": 6,   "d": {     "requestType": "GetInputList",     "requestId": "f819dcf0-89cc-11eb-8f0e-382c4ac93b9c",     "requestData": {     }   } }
     NSDictionary *dict = @{@"op":@(6),
                            @"d": @{@"requestType": @"GetInputList",
-                                   @"requestId": self.requestID,
+                                   @"requestId": self.requestId,
                                    @"requestData": @{}}};
     return [self convertToJson:dict];
 }
@@ -159,13 +200,13 @@ typedef enum  {
 
  */
 - (void)handleInputList:(NSDictionary *)dict {
-    // Preview, Program, Source
+    // Column IDs: videoActive, videoShowing, inputName
     NSMutableArray *array = [NSMutableArray array];
     NSArray *inputs = dict[@"inputs"];
     for (NSDictionary *input in inputs) {
         NSString *name = input[@"inputName"];
         if (name) {
-            [array addObject:[NSMutableDictionary dictionaryWithDictionary:@{@"Source":name}]];
+            [array addObject:[NSMutableDictionary dictionaryWithDictionary:@{@"inputName":name}]];
         }
     }
     self.obsInputs = array;
@@ -176,12 +217,12 @@ typedef enum  {
 - (void)handleSourceActive:(NSDictionary *)dict {
     NSString *sourceName = dict[@"requestId"];
     NSDictionary *responseData = dict[@"responseData"];
-    BOOL preview = [responseData[@"videoActive"] boolValue];
-    BOOL program = [responseData[@"videoShowing"] boolValue];
+    BOOL videoActive = [responseData[@"videoActive"] boolValue];
+    BOOL videoShowing = [responseData[@"videoShowing"] boolValue];
     for (NSMutableDictionary *input in self.obsInputs) {
-        if ([input[@"Source"] isEqualToString:sourceName]) {
-            input[@"Preview"] = preview ? @"Y" : @"N";
-            input[@"Program"] = program ? @"Y" : @"N";
+        if ([input[@"inputName"] isEqualToString:sourceName]) {
+            input[@"videoActive"] = videoActive ? @"Y" : @"N";
+            input[@"videoShowing"] = videoShowing ? @"Y" : @"N";
             [self.tableView reloadData];
             break;
         }
@@ -200,14 +241,35 @@ typedef enum  {
 
 - (void)getSourceActive {
     for (NSDictionary *dict in self.obsInputs) {
-        NSString *json = [self jsonGetSourceActive:dict[@"Source"]];
+        NSString *json = [self jsonGetSourceActive:dict[@"inputName"]];
         [self sendString:json];
     }
 
 }
 - (void)handleEventResponse:(NSDictionary *)dict {
-    // Whatever the event, we need to ask all the cameras about their current state.
-    [self getSourceActive];
+    NSDictionary *data = dict[@"d"];
+    NSNumber *intentObj = data[@"eventIntent"];
+    if (intentObj == nil) {
+        [self writeToConsole:[NSString stringWithFormat:@"bad dictionary: %@", dict] color:[NSColor redColor]];
+        return;
+    }
+    NSInteger intent = [intentObj integerValue];
+    if (intent == ES_Scenes) {
+        // Ignore SceneCreated, SceneRemoved, and SceneListChanged
+        NSString *eventType = data[@"eventType"];
+        if ([eventType isEqualToString:@"CurrentProgramSceneChanged"] ||
+            [eventType isEqualToString:@"CurrentPreviewSceneChanged"]) {
+            [self getSourceActive];
+        }
+    } else if (intent == ES_General) {
+        // Ignore Vendor and Custom events.
+        NSString *eventType = data[@"eventType"];
+        if ([eventType isEqualToString:@"ExitStarted"]) {
+            self.running = NO;
+        }
+    } else {
+        [self writeToConsole:[NSString stringWithFormat:@"%@", dict] color:[NSColor redColor]];
+    }
 }
 
 
@@ -234,6 +296,9 @@ typedef enum  {
         case Op_RequestResponse:
             [self handleRequestResponse:dict];
             break;
+        default:
+            [self writeToConsole:[NSString stringWithFormat:@"%@", dict] color:[NSColor redColor]];
+            break;
     }
 }
 
@@ -258,11 +323,15 @@ typedef enum  {
 }
 
 - (void)runSocketFromURL:(NSString *)url {
-    self.running = YES;
     
     dispatch_async(socketQueue, ^() {
         using easywsclient::WebSocket;
         std::unique_ptr<WebSocket> ws(WebSocket::from_url([url UTF8String]));
+        if (ws == NULL) {
+            [self writeToConsole:[NSString stringWithFormat:@"Unable to connect to %@", url] color:[NSColor redColor]];
+            return;
+        }
+        self.running = YES;
         while (self.running) {
             if (ws->getReadyState() == WebSocket::CLOSED)
                 break;
@@ -271,7 +340,7 @@ typedef enum  {
                 ws->send(data);
             ws->poll();
             ws->dispatch([&](const std::string & message) {
-                std::cout << message << '\n';
+//                std::cout << message << '\n';
                 self->incoming.push(message);
                 [self recvString];
             });
@@ -279,6 +348,7 @@ typedef enum  {
         }
         ws->close();
         ws->poll();
+        self.connected = NO;
     });
 
 }
@@ -286,8 +356,8 @@ typedef enum  {
     if (self.connected) {
         return;
     }
-    [self runSocketFromURL:@"ws://localhost:4455"];
-    [self writeToConsole:@"Connecting..."];
+    [self runSocketFromURL:self.obsURL];
+    [self writeToConsole:[NSString stringWithFormat:@"Connecting to %@...", self.obsURL]];
 }
 
 - (IBAction)sendCommand:(id)sender {
@@ -303,17 +373,19 @@ typedef enum  {
 
 - (void)writeToConsole:(NSString *)inString color:(NSColor *)color
 {
-    NSTextStorage *textStorage = [self.console textStorage];
-    [textStorage beginEditing];
-    NSString *string = [inString stringByAppendingString:@"\n"];
-    NSAttributedString *attributedString = [[NSAttributedString alloc] initWithString:string attributes:
-                                            @{NSFontAttributeName:[NSFont userFixedPitchFontOfSize:[NSFont systemFontSize]],
-                                              NSForegroundColorAttributeName:(color ?: [NSColor systemGreenColor])}];
-    
-    [textStorage appendAttributedString:attributedString];
-    [textStorage endEditing];
-    NSRange range = NSMakeRange([[self.console string] length], 0);
-    [self.console scrollRangeToVisible:range];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSTextStorage *textStorage = [self.console textStorage];
+        [textStorage beginEditing];
+        NSString *string = [inString stringByAppendingString:@"\n"];
+        NSAttributedString *attributedString = [[NSAttributedString alloc] initWithString:string attributes:
+                                                @{NSFontAttributeName:[NSFont userFixedPitchFontOfSize:[NSFont systemFontSize]],
+                                                  NSForegroundColorAttributeName:(color ?: [NSColor systemGreenColor])}];
+        
+        [textStorage appendAttributedString:attributedString];
+        [textStorage endEditing];
+        NSRange range = NSMakeRange([[self.console string] length], 0);
+        [self.console scrollRangeToVisible:range];
+    });
 }
 
 #pragma mark tableview
